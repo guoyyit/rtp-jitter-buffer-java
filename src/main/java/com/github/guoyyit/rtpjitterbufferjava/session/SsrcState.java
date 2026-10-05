@@ -14,6 +14,7 @@ public class SsrcState {
     private final long ssrc;
     private final JitterBuffer jitterBuffer;
     private final ReceiveCounters counters = new ReceiveCounters();
+    private final long clockRate;
 
     private boolean initialized;
     private long baseSeq;
@@ -27,6 +28,7 @@ public class SsrcState {
 
     public SsrcState(long ssrc, JitterBufferConfig config, long clockRate) {
         this.ssrc = ssrc;
+        this.clockRate = clockRate;
         this.jitterBuffer = new JitterBuffer(ssrc, config, clockRate);
     }
 
@@ -78,5 +80,14 @@ public class SsrcState {
 
     public long lastArrivalNanos() {
         return lastArrivalNanos;
+    }
+
+    /**
+     * RFC 3550 A.8 interarrival jitter expressed in RTP clock units for use in
+     * the RTCP report block.
+     */
+    public long interarrivalJitterClockUnits() {
+        long jitterNanos = jitterBuffer.jitterNanos();
+        return jitterNanos * clockRate / 1_000_000_000L;
     }
 }

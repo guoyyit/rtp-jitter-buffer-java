@@ -21,6 +21,9 @@ public class ReceiveCounters {
     private volatile long extendedMax;
     private volatile int cycles;
     private volatile long baseSeq = -1;
+    // RFC 3550 A.3 interval baseline for fraction lost.
+    private volatile long extendedMaxPrior;
+    private volatile long receivedUniquePrior;
 
     public ReceiveCounters() {
         for (RtpRejectReason reason : RtpRejectReason.values()) {
@@ -127,6 +130,31 @@ public class ReceiveCounters {
         return extendedMax;
     }
 
+    /**
+     * Captures the RFC 3550 A.3 "prior" baseline just before a report is sent.
+     */
+    public void markReportBaseline() {
+        extendedMaxPrior = baseSeq < 0 ? 0L : extendedMax - baseSeq + 1;
+        receivedUniquePrior = received.get() - duplicates.get();
+    }
+
+    /** Fraction lost since the last {@link #markReportBaseline()} as [0,255]. */
+    public int fractionLostOctetSinceBaseline() {
+        long expectedNow = baseSeq < 0 ? 0L : extendedMax - baseSeq + 1;
+        long expectedInterval = expectedNow - extendedMaxPrior;
+        if (expectedInterval <= 0) {
+            return 0;
+        }
+        long receivedInterval =
+                (received.get() - duplicates.get()) - receivedUniquePrior;
+        long lostInterval = expectedInterval - receivedInterval;
+        if (lostInterval <= 0) {
+            return 0;
+        }
+        long scaled = lostInterval * 256L / expectedInterval;
+        return (int) Math.min(255L, scaled);
+    }
+
     public long expectedSince(ReceiveCounters other) {
         long expectedNow = baseSeq < 0 ? 0 : extendedMax - baseSeq + 1;
         long expectedThen = other.baseSeq < 0 ? 0 : other.extendedMax - other.baseSeq + 1;
@@ -161,6 +189,8 @@ public class ReceiveCounters {
         target.extendedMax = extendedMax;
         target.cycles = cycles;
         target.baseSeq = baseSeq;
+        target.extendedMaxPrior = extendedMaxPrior;
+        target.receivedUniquePrior = receivedUniquePrior;
     }
 
     public ReceiveCounters snapshot() {

@@ -26,6 +26,10 @@ public class RtcpReporter {
         List<ReportBlock> reportBlocks();
 
         SenderInfo senderInfo();
+
+        /** Invoked after a compound report was handed to the sink successfully. */
+        default void onReportSent() {
+        }
     }
 
     /** Sink for encoded RTCP datagrams (typically a PacketTransport). */
@@ -90,6 +94,7 @@ public class RtcpReporter {
                         reportSource.cname(), senderInfo, reportSource.reportBlocks());
         try {
             sink.send(compound);
+            reportSource.onReportSent();
         } catch (IOException error) {
             throw new UncheckedIOException(error);
         }
@@ -103,6 +108,11 @@ public class RtcpReporter {
                         reportSource.cname(), reportSource.reportBlocks())
                 : builder.buildSenderReport(reportSource.localSsrc(),
                         reportSource.cname(), senderInfo, reportSource.reportBlocks());
+    }
+
+    /** Encodes a receiver report from externally assembled blocks. */
+    public byte[] buildReceiverReport(long localSsrc, String cname, List<ReportBlock> blocks) {
+        return builder.buildReceiverReport(localSsrc, cname, blocks);
     }
 
     private void emitSafely() {

@@ -23,13 +23,19 @@ public class RtcpPacketParser {
             if (version != 2) {
                 throw new IllegalArgumentException("unsupported RTCP version: " + version);
             }
-            int padding = (first & 0x20) != 0 ? (raw[length - 1] & 0xFF) : 0;
             int itemCount = first & 0x1F;
             int payloadType = raw[offset + 1] & 0xFF;
             int wordLength = ((raw[offset + 2] & 0xFF) << 8) | (raw[offset + 3] & 0xFF);
             int packetLength = (wordLength + 1) * 4;
             if (packetLength <= 0 || offset + packetLength > length) {
                 throw new IllegalArgumentException("RTCP item length runs past datagram");
+            }
+            int padding = 0;
+            if ((first & 0x20) != 0) {
+                padding = raw[offset + packetLength - 1] & 0xFF;
+                if (padding <= 0 || padding >= packetLength) {
+                    throw new IllegalArgumentException("invalid RTCP padding length");
+                }
             }
 
             switch (payloadType) {
@@ -42,8 +48,14 @@ public class RtcpPacketParser {
             }
             offset += packetLength;
             if (padding > 0) {
+                if (offset != length) {
+                    throw new IllegalArgumentException("RTCP padding must end the datagram");
+                }
                 break;
             }
+        }
+        if (offset != length) {
+            throw new IllegalArgumentException("trailing bytes after RTCP compound");
         }
         return messages;
     }
