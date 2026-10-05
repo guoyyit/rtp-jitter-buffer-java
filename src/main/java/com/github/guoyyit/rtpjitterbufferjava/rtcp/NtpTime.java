@@ -32,6 +32,19 @@ public final class NtpTime {
         return (ntp >>> 16) & 0xFFFFFFFFL;
     }
 
+    /** Returns the NTP timestamp {@code nanos} later than {@code ntp}. */
+    public static long addNanos(long ntp, long nanos) {
+        long seconds = (ntp >>> 32) + Math.floorDiv(nanos, 1_000_000_000L);
+        long remainNanos = Math.floorMod(nanos, 1_000_000_000L);
+        long fraction = (ntp & 0xFFFFFFFFL)
+                + Math.round(remainNanos / 1_000_000_000.0 * 0x100000000L);
+        if (fraction >= 0x100000000L) {
+            seconds++;
+            fraction -= 0x100000000L;
+        }
+        return (seconds << 32) | (fraction & 0xFFFFFFFFL);
+    }
+
     /** Difference in nanoseconds between two 64-bit NTP timestamps. */
     public static long diffNanos(long newerNtp, long olderNtp) {
         long newerSec = newerNtp >>> 32;

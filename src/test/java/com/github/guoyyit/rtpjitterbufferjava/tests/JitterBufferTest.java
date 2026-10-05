@@ -70,11 +70,26 @@ class JitterBufferTest {
     }
 
     @Test
-    void rejectsPacketsBeyondReorderWindow() {
+    void acceptsForwardJumpsBeyondReorderWindow() {
         JitterBuffer buffer = buffer();
         buffer.admit(parsed(0, 0, 0));
-        assertEquals(AdmissionOutcome.REORDER_WINDOW_EXCEEDED,
+        // Burst loss of 99 packets with a 32-packet reorder window: the
+        // forward jump must be admitted so the stream can recover.
+        assertEquals(AdmissionOutcome.ACCEPTED,
                 buffer.admit(parsed(100, 8000, 1_000_000)));
+    }
+
+    @Test
+    void dropsBackwardPacketsBeyondReorderWindow() {
+        JitterBuffer buffer = buffer();
+        buffer.admit(parsed(0, 0, 0));
+        buffer.admit(parsed(100, 8000, 1_000_000));
+        // 60 < 100 - 32: too far behind the highest seen sequence.
+        assertEquals(AdmissionOutcome.REORDER_WINDOW_EXCEEDED,
+                buffer.admit(parsed(60, 4800, 2_000_000)));
+        // 80 >= 100 - 32: still inside the reorder window, admitted.
+        assertEquals(AdmissionOutcome.ACCEPTED,
+                buffer.admit(parsed(80, 6400, 3_000_000)));
     }
 
     @Test

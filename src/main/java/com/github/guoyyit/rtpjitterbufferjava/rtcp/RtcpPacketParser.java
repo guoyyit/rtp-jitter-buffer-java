@@ -11,6 +11,22 @@ import java.util.Map;
  */
 public class RtcpPacketParser {
 
+    /**
+     * Demultiplexes RTCP from RTP on a shared channel (RFC 5761 section 4):
+     * RTCP packet types 200..204 never collide with RTP payload types because
+     * the marker bit separates the ranges.
+     */
+    public static boolean isRtcp(byte[] raw, int length) {
+        if (raw == null || length < 2 || raw.length < 2) {
+            return false;
+        }
+        int version = (raw[0] >> 6) & 0x03;
+        int packetType = raw[1] & 0xFF;
+        return version == 2
+                && packetType >= RtcpMessage.PT_SR
+                && packetType <= RtcpMessage.PT_APP;
+    }
+
     public List<RtcpMessage> parse(byte[] raw, int length) {
         if (raw == null || length < 4 || raw.length < length) {
             throw new IllegalArgumentException("truncated RTCP packet");

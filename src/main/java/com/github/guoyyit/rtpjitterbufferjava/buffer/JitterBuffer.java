@@ -64,7 +64,12 @@ public class JitterBuffer {
         if (packets.containsKey(extended)) {
             return AdmissionOutcome.DUPLICATE;
         }
-        if (extended - highestExtended > config.reorderWindowPackets()) {
+        // The reorder window only constrains the backward direction: packets
+        // that fall behind the highest seen sequence by more than the window
+        // are too old to be worth buffering. Forward jumps (burst loss
+        // recovery) are always accepted so the stream can resume.
+        if (extended < highestExtended
+                && highestExtended - extended > config.reorderWindowPackets()) {
             return AdmissionOutcome.REORDER_WINDOW_EXCEEDED;
         }
         if (extended > highestExtended) {
